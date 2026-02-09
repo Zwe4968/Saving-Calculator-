@@ -1,206 +1,150 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
-from matplotlib.animation import FuncAnimation
-import numpy as np
 
-class SavingsCalculatorApp:
+class InvestmentSimulatorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Chicken Fried Saving Money Calculator")
-        self.root.geometry("600x700")
+        self.root.title("Investment Simulation Calculator")
+        self.root.geometry("700x760")
         self.root.configure(bg="#f0f0f0")
-        
-        # Animation state
-        self.animation_running = False
-        self.animation_frame = 0
-        self.animation_data = {}
-        
-        # Title
-        title_label = tk.Label(
-            root,
-            text="Savings Money Calculator",
-            font=("Arial", 16, "bold"),
-            bg="#f0f0f0",
-            fg="#333333"
+
+        title = tk.Label(
+            root, text="Investment Simulation (Monthly Compounding)",
+            font=("Arial", 16, "bold"), bg="#f0f0f0", fg="#333333"
         )
-        title_label.pack(pady=10)
-        
-        # Input Frame
+        title.pack(pady=10)
+
         input_frame = ttk.Frame(root)
         input_frame.pack(pady=10, padx=20, fill="x")
-        
+
         # Initial Money
-        ttk.Label(input_frame, text="Initial Money ($):").grid(row=0, column=0, sticky="w", pady=5)
-        self.initial_money_entry = ttk.Entry(input_frame, width=30)
-        self.initial_money_entry.grid(row=0, column=1, pady=5, padx=10)
-        self.initial_money_entry.insert(0, "1000")
-        
+        ttk.Label(input_frame, text="Initial Money:").grid(row=0, column=0, sticky="w", pady=6)
+        self.initial_entry = ttk.Entry(input_frame, width=30)
+        self.initial_entry.grid(row=0, column=1, pady=6, padx=10)
+        self.initial_entry.insert(0, "1000")
+
         # Monthly Saving
-        ttk.Label(input_frame, text="Monthly Saving ($):").grid(row=1, column=0, sticky="w", pady=5)
-        self.monthly_saving_entry = ttk.Entry(input_frame, width=30)
-        self.monthly_saving_entry.grid(row=1, column=1, pady=5, padx=10)
-        self.monthly_saving_entry.insert(0, "100")
-        
-        # Number of Months
-        ttk.Label(input_frame, text="Number of Months:").grid(row=2, column=0, sticky="w", pady=5)
+        ttk.Label(input_frame, text="Monthly Saving:").grid(row=1, column=0, sticky="w", pady=6)
+        self.monthly_entry = ttk.Entry(input_frame, width=30)
+        self.monthly_entry.grid(row=1, column=1, pady=6, padx=10)
+        self.monthly_entry.insert(0, "100")
+
+        # Months
+        ttk.Label(input_frame, text="Investment Period (months):").grid(row=2, column=0, sticky="w", pady=6)
         self.months_entry = ttk.Entry(input_frame, width=30)
-        self.months_entry.grid(row=2, column=1, pady=5, padx=10)
-        self.months_entry.insert(0, "12")
-        
-        # Button Frame
-        button_frame = ttk.Frame(root)
-        button_frame.pack(pady=10)
-        
-        calculate_btn = ttk.Button(button_frame, text="Calculate & Show Graph", command=self.calculate)
-        calculate_btn.pack(side="left", padx=5)
-        
-        clear_btn = ttk.Button(button_frame, text="Clear", command=self.clear_inputs)
-        clear_btn.pack(side="left", padx=5)
-        
-        # Result Frame
-        result_frame = ttk.Frame(root)
-        result_frame.pack(pady=10, padx=20, fill="x")
-        
-        self.result_label = ttk.Label(result_frame, text="", font=("Arial", 10))
-        self.result_label.pack(anchor="w", pady=5)
-        
-        # Canvas for Chart
+        self.months_entry.grid(row=2, column=1, pady=6, padx=10)
+        self.months_entry.insert(0, "60")
+
+        # Annual rate (%)
+        ttk.Label(input_frame, text="Annual Rate (% per year):").grid(row=3, column=0, sticky="w", pady=6)
+        self.annual_rate_entry = ttk.Entry(input_frame, width=30)
+        self.annual_rate_entry.grid(row=3, column=1, pady=6, padx=10)
+        self.annual_rate_entry.insert(0, "9.5")  # example: 9.5%
+
+        btn_frame = ttk.Frame(root)
+        btn_frame.pack(pady=10)
+
+        ttk.Button(btn_frame, text="Simulate & Show Graph", command=self.simulate).pack(side="left", padx=6)
+        ttk.Button(btn_frame, text="Clear", command=self.clear).pack(side="left", padx=6)
+
+        self.result_label = ttk.Label(root, text="", font=("Arial", 10))
+        self.result_label.pack(pady=6, padx=20, anchor="w")
+
+        # Canvas frame
         self.canvas_frame = ttk.Frame(root)
         self.canvas_frame.pack(pady=10, padx=20, fill="both", expand=True)
-    
-    def clear_inputs(self):
-        self.animation_running = False
-        self.initial_money_entry.delete(0, tk.END)
-        self.initial_money_entry.insert(0, "1000")
-        self.monthly_saving_entry.delete(0, tk.END)
-        self.monthly_saving_entry.insert(0, "100")
+
+    def clear(self):
+        self.initial_entry.delete(0, tk.END)
+        self.initial_entry.insert(0, "1000")
+        self.monthly_entry.delete(0, tk.END)
+        self.monthly_entry.insert(0, "100")
         self.months_entry.delete(0, tk.END)
-        self.months_entry.insert(0, "12")
+        self.months_entry.insert(0, "60")
+        self.annual_rate_entry.delete(0, tk.END)
+        self.annual_rate_entry.insert(0, "9.5")
         self.result_label.config(text="")
-        
-        # Clear canvas
-        for widget in self.canvas_frame.winfo_children():
-            widget.destroy()
-    
-    def calculate(self):
+
+        for w in self.canvas_frame.winfo_children():
+            w.destroy()
+
+    def simulate(self):
         try:
-            initial_money = float(self.initial_money_entry.get())
-            monthly_saving = float(self.monthly_saving_entry.get())
+            initial_money = float(self.initial_entry.get())
+            monthly_saving = float(self.monthly_entry.get())
             months = int(self.months_entry.get())
-            
+            annual_rate_percent = float(self.annual_rate_entry.get())
+
             if months <= 0:
-                messagebox.showerror("Error", "Number of months must be positive!")
+                messagebox.showerror("Error", "Investment period (months) must be positive.")
                 return
-            
+            if initial_money < 0 or monthly_saving < 0:
+                messagebox.showerror("Error", "Initial money and monthly saving must be non-negative.")
+                return
+
+            # Convert annual rate (%) -> decimal
+            annual_rate = annual_rate_percent / 100.0
+
+            # Requirement: annual_rate -> monthly_rate using **
+            # Effective monthly rate assuming compounding:
+            monthly_rate = (1 + annual_rate) ** (1/12) - 1
+
             month_list = []
-            money_list = []
-            total_money = initial_money
-            
-            for month in range(1, months + 1):
-                total_money += monthly_saving
-                month_list.append(month)
-                money_list.append(total_money)
-            
-            final_money = total_money
-            total_saved = final_money - initial_money
-            
-            # Update result label
-            result_text = f"Final Amount: ${final_money:,.2f} | Total Saved: ${total_saved:,.2f}"
-            self.result_label.config(text=result_text)
-            
-            # Clear previous canvas
-            for widget in self.canvas_frame.winfo_children():
-                widget.destroy()
-            
-            # Create figure with animation
-            fig = Figure(figsize=(5, 4), dpi=100)
+            balance_list = []
+
+            balance = initial_money
+
+
+            for m in range(1, months + 1):
+                balance = balance * (1 + monthly_rate) + monthly_saving
+                month_list.append(m)
+                balance_list.append(balance)
+
+            final_balance = balance_list[-1]
+            total_contributed = initial_money + monthly_saving * months
+            total_gain = final_balance - total_contributed
+
+            self.result_label.config(
+                text=(
+                    f"Monthly rate ≈ {monthly_rate*100:.4f}% | "
+                    f"Final = {final_balance:,.2f} | "
+                    f"Contributed = {total_contributed:,.2f} | "
+                    f"Gain/Loss = {total_gain:,.2f}"
+                )
+            )
+
+            # Clear old chart
+            for w in self.canvas_frame.winfo_children():
+                w.destroy()
+
+            # Plot
+            fig = Figure(figsize=(6.2, 4.6), dpi=100)
             ax = fig.add_subplot(111)
-            ax.set_xlim(0, months + 1)
-            ax.set_ylim(min(money_list) * 0.9, max(money_list) * 1.1)
-            ax.set_xlabel("Month", fontsize=10)
-            ax.set_ylabel("Total Money ($)", fontsize=10)
-            ax.set_title("Savings Progress Over Time", fontsize=12, fontweight="bold")
+            ax.plot(month_list, balance_list, marker="o", linewidth=2)
+            ax.set_title("Accumulated Balance by Month")
+            ax.set_xlabel("Month")
+            ax.set_ylabel("Balance")
             ax.grid(True, alpha=0.3)
-            
-            # Line and scatter for animation
-            line, = ax.plot([], [], marker="o", linestyle="-", linewidth=2.5, markersize=6, color="#4CAF50", label="Savings")
-            scatter = ax.scatter([], [], color="#FF6B6B", s=100, zorder=5, alpha=0)
-            text_annotation = ax.text(0.02, 0.98, "", transform=ax.transAxes, 
-                                     verticalalignment='top', fontsize=9,
-                                     bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-            ax.legend(loc="upper right")
-            
-            fig.tight_layout()
-            
-            # Embed chart in tkinter
+
+            # Embed
             canvas = FigureCanvasTkAgg(fig, master=self.canvas_frame)
             canvas.draw()
             canvas.get_tk_widget().pack(fill="both", expand=True)
-            
-            # Animation state
-            self.animation_frame = 0
-            self.animation_running = True
-            self.animation_data = {
-                'month_list': month_list,
-                'money_list': money_list,
-                'line': line,
-                'scatter': scatter,
-                'text_annotation': text_annotation,
-                'fig': fig,
-                'canvas': canvas
-            }
-            
-            # Start animation loop
-            self.animate_step()
-            
+
         except ValueError:
-            messagebox.showerror("Error", "Please enter valid numbers!")
-    
-    def animate_step(self):
-        """Animate the graph step by step"""
-        if not self.animation_running:
-            return
-        
-        data = self.animation_data
-        month_list = data['month_list']
-        money_list = data['money_list']
-        line = data['line']
-        scatter = data['scatter']
-        text_annotation = data['text_annotation']
-        canvas = data['canvas']
-        
-        frame = self.animation_frame
-        
-        # Update line data
-        line.set_data(month_list[:frame + 1], money_list[:frame + 1])
-        
-        # Update scatter point
-        if frame > 0:
-            scatter.set_offsets(np.c_[month_list[frame:frame+1], money_list[frame:frame+1]])
-            scatter.set_alpha(min(1.0, (frame % 10) / 10.0))
-        
-        # Update text annotation
-        if frame > 0:
-            progress = f"Month {month_list[frame]}: ${money_list[frame]:,.2f}"
-            text_annotation.set_text(progress)
-        
-        # Redraw canvas
-        canvas.draw()
-        
-        # Move to next frame
-        self.animation_frame += 1
-        
-        # Loop animation
-        if self.animation_frame >= len(month_list):
-            self.animation_frame = 0
-        
-        # Schedule next frame
-        self.root.after(200, self.animate_step)
+            messagebox.showerror("Error", "Please enter valid numbers.")
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = SavingsCalculatorApp(root)
-    root.mainloop()
+    app = InvestmentSimulatorApp(root)
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        print("Interrupted by user — closing application.")
+        try:
+            root.destroy()
+        except Exception:
+            pass
